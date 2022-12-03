@@ -2,6 +2,7 @@
 
 const express = require("express");
 const dotenv = require("dotenv");
+const _ = require("lodash");
 
 // ENVIRONMENT
 dotenv.config();
@@ -54,10 +55,23 @@ app.post("/compose", (req, res) => {
   const post = {
     title: req.body.postTitle,
     content: req.body.postText,
+    url: _.kebabCase(req.body.postTitle),
   };
 
   posts.push(post);
   res.redirect("/");
+});
+
+app.get("/posts/:postTitle", (req, res) => {
+  posts.forEach(post => {
+    if (_.lowerCase(post.title) === _.lowerCase(req.params.postTitle)) {
+      res.render("post", {
+        title: post.title,
+        content: post.content,
+      });
+    };
+  });
+  res.render("404");
 });
 
 
