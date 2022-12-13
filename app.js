@@ -3,6 +3,7 @@
 const express = require("express");
 const dotenv = require("dotenv");
 const _ = require("lodash");
+const mongoose = require("mongoose");
 
 // ENVIRONMENT
 dotenv.config();
@@ -25,13 +26,47 @@ const aboutContent = "Hac habitasse platea dictumst vestibulum rhoncus est pelle
 const contactContent = "Scelerisque eleifend donec pretium vulputate sapien. Rhoncus urna neque viverra justo nec ultrices. Arcu dui vivamus arcu felis bibendum. Consectetur adipiscing elit duis tristique. Risus viverra adipiscing at in tellus integer feugiat. Sapien nec sagittis aliquam malesuada bibendum arcu vitae. Consequat interdum varius sit amet mattis. Iaculis nunc sed augue lacus. Interdum posuere lorem ipsum dolor sit amet consectetur adipiscing elit. Pulvinar elementum integer enim neque. Ultrices gravida dictum fusce ut placerat orci nulla. Mauris in aliquam sem fringilla ut morbi tincidunt. Tortor posuere ac ut consequat semper viverra nam libero.";
 const port = process.env.PORT || 3000;
 const posts = [];
+const dbUser = process.env.DB_USER;
+const dbPass = process.env.DB_PASS;
+const dbEndpoint = process.env.DB_ENDPOINT;
+const dbName = "blog";
+
+// --- DATABASE ---
+const url = `mongodb+srv://${dbUser}:${dbPass}@${dbEndpoint}/${dbName}?retryWrites=true&w=majority`;
+mongoose.connect(url, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+}).then(() => {
+  console.log("Succesfully connected to database.");
+}).catch(e => {
+  console.log(e);
+});
+
+const postSchema = mongoose.Schema({
+  title: String,
+  content: String,
+  url: String,
+});
+
+const Post = mongoose.model("post", postSchema);
 
 // --- PAGES ---
 
 app.get("/", (req, res) => {
-  res.render("home", {
-    homeContent: homeStartingContent,
-    posts: posts,
+  Post.find({}, (e, docs) => {
+    if (!e) {
+      res.render("home", {
+        homeContent: homeStartingContent,
+        posts: docs,
+      });
+
+    } else {
+      console.log(e);
+      res.render("home", {
+        homeContent: homeStartingContent,
+        posts: posts,
+      });
+    };
   });
 });
 
@@ -52,26 +87,35 @@ app.get("/compose", (req, res) => {
 });
 
 app.post("/compose", (req, res) => {
-  const post = {
+  // Create new post document
+  const post = new Post({
     title: req.body.postTitle,
     content: req.body.postText,
     url: _.kebabCase(req.body.postTitle),
-  };
+  })
 
-  posts.push(post);
-  res.redirect("/");
+  // Save post
+  post.save().then(() => {
+    console.log("Post added to database.")
+    res.redirect("/");
+  }).catch(e => {
+    console.log("e");
+    res.redirect("/compose");
+  });
 });
 
-app.get("/posts/:postTitle", (req, res) => {
-  posts.forEach(post => {
-    if (_.lowerCase(post.title) === _.lowerCase(req.params.postTitle)) {
+app.get("/posts/:postId", (req, res) => {
+  Post.findById(req.params.postId, (err, post) => {
+    if (!err) {
+      console.log(`Serving post ${post._id}.`)
       res.render("post", {
         title: post.title,
         content: post.content,
       });
+    } else {
+      res.render("404");
     };
   });
-  res.render("404");
 });
 
 
